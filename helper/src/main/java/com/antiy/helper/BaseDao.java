@@ -182,7 +182,7 @@ public abstract class BaseDao<T> implements IBaseDao<T> {
      */
     @Override
     public int update(T entity, T where) {
-        int result = -1;
+        int result;
         Map<String, String> values = getValues(entity);
         Map<String, String> whereCause = getValues(where);
         Condition condition = new Condition(whereCause);

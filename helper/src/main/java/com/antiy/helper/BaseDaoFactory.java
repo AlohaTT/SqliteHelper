@@ -1,7 +1,7 @@
 package com.antiy.helper;
 
 import android.database.sqlite.SQLiteDatabase;
-import android.os.Environment;
+import android.support.annotation.NonNull;
 
 /**
  * @ClassName BaseDaoFactory
@@ -11,17 +11,32 @@ import android.os.Environment;
  * @Version 1.0
  */
 public class BaseDaoFactory {
-    private String mPath;
+    private static String mPath;
     private SQLiteDatabase mDatabase;
-    private static BaseDaoFactory instance = new BaseDaoFactory();
+    private volatile static BaseDaoFactory instance;
 
     public static BaseDaoFactory getInstance() {
+        if (instance == null) {
+            synchronized (BaseDaoFactory.class) {
+                if (instance == null) {
+                    instance = new BaseDaoFactory();
+                }
+            }
+        }
         return instance;
     }
 
     private BaseDaoFactory() {
-        mPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/teacher.db";
         openDatabase();
+    }
+
+    /**
+     * 配置数据库存储路径
+     *
+     * @param path
+     */
+    public static void init(@NonNull String path) {
+        mPath = path;
     }
 
     public synchronized <T extends BaseDao<M>, M> T getDbHelper(Class<T> clazz, Class<M> entityClazz) {
@@ -38,6 +53,9 @@ public class BaseDaoFactory {
     }
 
     private void openDatabase() {
+        if (mPath == null) {
+            throw new NullPointerException("You need to init database path first!");
+        }
         this.mDatabase = SQLiteDatabase.openOrCreateDatabase(mPath, null);
     }
 }
