@@ -1,5 +1,7 @@
 package com.antiy.helper;
 
+import java.util.List;
+
 /**
  * @ClassName IBaseDao
  * @Description TODO
@@ -13,7 +15,7 @@ public interface IBaseDao<T> {
      * @param entity
      * @return
      */
-    Long insert(T entity);
+    long insert(T entity);
 
     /**
      * 改
@@ -21,6 +23,26 @@ public interface IBaseDao<T> {
      * @param where
      * @return
      */
-    Long update(T entity, T where);
+    int update(T entity, T where);
 
+    /**
+     * 删
+     * @param where
+     * @return
+     */
+    int delete(T where);
+
+    /**
+     * 查
+     */
+    List<T> query(T where);
+
+    List<T> query(T where, String orderBy, Integer startIndex, Integer limit);
+
+    /**
+     * 预留多表查询等复杂查询的接口
+     * @param sql
+     * @return
+     */
+    List<T> query(String sql);
 }

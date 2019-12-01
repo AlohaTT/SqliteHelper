@@ -9,8 +9,10 @@ import com.antiy.helper.annotation.DbField;
 import com.antiy.helper.annotation.DbTable;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -118,15 +120,6 @@ public abstract class BaseDao<T> implements IBaseDao<T> {
 
     }
 
-    /**
-     * 创建表
-     *
-     * @return
-     */
-    protected abstract String createTable();
-
-
-
     private ContentValues getContentValues(Map<String, String> map) {
         ContentValues contentValues = new ContentValues();
         Set<String> keys = map.keySet();
@@ -174,7 +167,7 @@ public abstract class BaseDao<T> implements IBaseDao<T> {
      * @return
      */
     @Override
-    public Long insert(T entity) {
+    public long insert(T entity) {
         Map<String, String> map = getValues(entity);
         ContentValues values = getContentValues(map);
         return mDatabase.insert(tableName, null, values);
@@ -188,8 +181,170 @@ public abstract class BaseDao<T> implements IBaseDao<T> {
      * @return
      */
     @Override
-    public Long update(T entity, T where) {
+    public int update(T entity, T where) {
+        int result = -1;
+        Map<String, String> values = getValues(entity);
+        Map<String, String> whereCause = getValues(where);
+        Condition condition = new Condition(whereCause);
+        ContentValues contentValues = getContentValues(values);
+        result = mDatabase.update(tableName, contentValues, condition.getWhereCause(), condition.getWhereArgs());
+        return result;
+    }
 
+
+    /**
+     * 创建表
+     *
+     * @return
+     */
+    protected abstract String createTable();
+
+    /**
+     * 封装修改语句
+     */
+    class Condition {
+        /**
+         * 查询条件
+         */
+        private String whereCause;
+
+        private String[] whereArgs;
+
+        public Condition(Map<String, String> whereCause) {
+            ArrayList<Object> list = new ArrayList<>();
+            StringBuilder sb = new StringBuilder();
+            sb.append(" 1=1 ");
+            Set<String> keys = whereCause.keySet();
+            Iterator<String> iterator = keys.iterator();
+            while (iterator.hasNext()) {
+                String key = iterator.next();
+                String value = whereCause.get(key);
+                if (value != null) {
+                    //拼接条件查询语句
+                    sb.append(" and " + key + " =?");
+                    list.add(value);
+                }
+                this.whereCause = sb.toString();
+                this.whereArgs = list.toArray(new String[list.size()]);
+            }
+        }
+
+        public String getWhereCause() {
+            return whereCause;
+        }
+
+        public void setWhereCause(String whereCause) {
+            this.whereCause = whereCause;
+        }
+
+        public String[] getWhereArgs() {
+            return whereArgs;
+        }
+
+        public void setWhereArgs(String[] whereArgs) {
+            this.whereArgs = whereArgs;
+        }
+    }
+
+    /**
+     * 删
+     *
+     * @param where
+     * @return
+     */
+    @Override
+    public int delete(T where) {
+        Map<String, String> map = getValues(where);
+        Condition condition = new Condition(map);
+        int result = mDatabase.delete(tableName, condition.getWhereCause(), condition.getWhereArgs());
+        return result;
+    }
+
+    /**
+     * 查
+     *
+     * @param where
+     */
+    @Override
+    public List<T> query(T where) {
+        return query(where, null, null, null);
+    }
+
+    @Override
+    public List<T> query(T where, String orderBy, Integer startIndex, Integer limit) {
+        Map<String, String> map = getValues(where);
+        String limitString = null;
+        if (startIndex != null && limit != null) {
+            limitString = startIndex + " , " + limit;
+        }
+        Condition condition = new Condition(map);
+        Cursor cursor = mDatabase.query(tableName, null, condition.getWhereCause(),
+                condition.getWhereArgs(), null, null, orderBy, limitString);
+        List<T> result = getResult(cursor, where);
+        cursor.close();
+        return result;
+    }
+
+    /**
+     * 获取查询结果
+     *
+     * @param cursor
+     * @param where
+     * @return
+     */
+    private List<T> getResult(Cursor cursor, T where) {
+        ArrayList list = new ArrayList<>();
+        Object item;
+        while (cursor.moveToNext()) {
+            try {
+                item = where.getClass().newInstance();
+                Iterator<Map.Entry<String, Field>> iterator = mCacheMap.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<String, Field> entry = iterator.next();
+                    //得到列名
+                    String columnName = entry.getKey();
+                    //以列名拿到返回的index
+                    Integer columnIndex = cursor.getColumnIndex(columnName);
+                    Field field = entry.getValue();
+                    Class type = field.getType();
+                    if (columnIndex != -1) {
+                        if (type == String.class) {
+                            //反射方式赋值
+                            field.set(item, cursor.getString(columnIndex));
+                        } else if (type == Double.class) {
+                            field.set(item, cursor.getDouble(columnIndex));
+                        } else if (type == Integer.class) {
+                            field.set(item, cursor.getInt(columnIndex));
+                        } else if (type == Long.class) {
+                            field.set(item, cursor.getLong(columnIndex));
+                        } else if (type == byte[].class) {
+                            field.set(item, cursor.getBlob(columnIndex));
+                        } else {
+                            /**
+                             * 不支持的类型
+                             */
+                            continue;
+                        }
+                    }
+                }
+                list.add(item);
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            } catch (InstantiationException e) {
+                e.printStackTrace();
+            }
+        }
+        return list;
+    }
+
+    /**
+     * 预留多表查询等复杂查询的接口
+     *
+     * @param sql
+     * @return
+     */
+    @Override
+    public List<T> query(String sql) {
         return null;
     }
 }
